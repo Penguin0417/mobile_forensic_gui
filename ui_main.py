@@ -15,6 +15,7 @@ from utils.device_handler import (
     get_device_folder  # Added to fetch device folders via ADB
 )
 from utils.data_exporter import export_data
+import subprocess
 
 class Ui_MainWindow(QMainWindow):
     def __init__(self):
@@ -27,7 +28,7 @@ class Ui_MainWindow(QMainWindow):
     def setupUi(self):
         self.central = QWidget()
         self.setCentralWidget(self.central)
-
+        
         layout = QVBoxLayout()
         self.toggle_mode_btn = QPushButton("Toggle Mode")
         self.toggle_mode_btn.clicked.connect(self.toggle_dark_mode)
@@ -46,7 +47,8 @@ class Ui_MainWindow(QMainWindow):
         self.extract_btn.clicked.connect(self.extract_device_data)
 
         self.checklist = QListWidget()
-        self.checklist.itemClicked.connect(self.navigate_forward)
+        self.checklist.itemDoubleClicked.connect(self.navigate_forward)
+        #self.checklist.itemClicked.connect(self.navigate_forward)
 
         self.filter_box = QLineEdit()
         self.filter_box.setPlaceholderText("Filter content by keyword...")
@@ -74,10 +76,6 @@ class Ui_MainWindow(QMainWindow):
         layout.addWidget(self.export_pdf)
         layout.addWidget(self.export_csv)
         self.central.setLayout(layout)
-
-    def adb_detect_device(self):
-        device_info = get_device_info()
-        self.device_label.setText(f"Device: {device_info}")
 
     def toggle_dark_mode(self):
         qss_path = os.path.join(os.path.dirname(__file__), "assets", "style.qss")
@@ -122,24 +120,45 @@ class Ui_MainWindow(QMainWindow):
                     break
             self.preview.setRowHidden(row, not visible)
 
-    def handle_preview_double_click(self, row, column):
-        name = self.preview.item(row, 0).text()
-        full_path = os.path.join(self.current_path, name)
-        self.selected_file_path = full_path
-        self.device_label.setText(f"Selected file: {name}")
+    def handle_preview_double_click(self, row, column=0):
+        name = self.preview.item(row, 0).text().strip()
+        full_path = f"{self.current_path.rstrip('/')}/{name}"
+
+        # Use 'ls -d path/' to check if it's a directory
+        try:
+            result = subprocess.check_output(["adb", "shell", "ls", "-d", f"{full_path}/"], stderr=subprocess.STDOUT, text=True, encoding='utf-8')
+            # It's a folder
+            self.current_path = full_path.strip()
+            self.selected_file_path = None
+            contents = get_device_folder(self.current_path)
+            self.checklist.clear()
+            self.checklist.addItems(contents)
+            self.device_label.setText(f"Navigated into: {self.current_path}")
+        except subprocess.CalledProcessError:
+            # It's a file
+            self.selected_file_path = full_path
+            self.device_label.setText(f"Selected file: {name}")
 
     def navigate_forward(self, item):
-        new_path = os.path.join(self.current_path, item.text())
-        self.current_path = new_path
-        self.selected_file_path = None
-        contents = get_device_folder(self.current_path)
-        self.checklist.clear()
-        self.checklist.addItems(contents)
-        self.device_label.setText(f"Current path: {self.current_path}")
+        new_path = f"{self.current_path.rstrip('/')}/{item.text().strip('/')}"
+        try:
+            result = subprocess.check_output(["adb", "shell", "ls", "-d", f"{new_path}/"], stderr=subprocess.STDOUT, text=True, encoding='utf-8')
+            # It's a folder
+            self.current_path = new_path.strip()
+            self.selected_file_path = None
+            contents = get_device_folder(self.current_path)
+            self.checklist.clear()
+            self.checklist.addItems(contents)
+            self.device_label.setText(f"Navigated into: {self.current_path}")
+        except subprocess.CalledProcessError:
+            # It's a file
+            self.selected_file_path = new_path
+            self.device_label.setText(f"Selected file: {item.text().strip('/')}")
 
     def navigate_back(self):
         if self.current_path and self.current_path != "/sdcard":
-            self.current_path = os.path.dirname(self.current_path)
+            self.current_path = '/'.join(self.current_path.strip('/').split('/')[:-1])
+            self.current_path = f"/{self.current_path}" if self.current_path else "/sdcard"
             contents = get_device_folder(self.current_path)
             self.checklist.clear()
             self.checklist.addItems(contents)

@@ -13,22 +13,22 @@ def get_device_info():
     
 def get_device_folder(path="/sdcard"):
     """
-    Returns a list of folders/files in the given path on the connected Android device.
+    Fetch and clean the list of files/folders from a given path on Android device via ADB.
+    Removes trailing slashes from folders for proper navigation.
     """
     try:
-        output = subprocess.check_output(["adb", "shell", "ls", "-p", path], stderr=subprocess.STDOUT).decode()
+        output = subprocess.check_output(["adb", "shell", "ls", "-p", path], stderr=subprocess.STDOUT, text=True)
         entries = output.strip().split("\n")
-        # Optional: Filter out '.' and '..' if they appear
-        folder = []
-        for entry in entries:
-            if entry!='.' and entry!='..':
-                folder.append(entry.rstrip("/"))
-        return folder
-        #return [entry.rstrip("/") for entry in entries if entry and entry != "." and entry != ".."]
+        
+        # Remove empty lines, remove any ANSI codes, and strip trailing slashes
+        cleaned_entries = [entry.rstrip('/') for entry in entries if entry and entry not in [".", ".."]]
+        
+        return cleaned_entries
     except subprocess.CalledProcessError as e:
-        print(f"ADB error: {e.output.decode()}")
+        print("ADB command failed:", e.output)
         return []
-
+    except FileNotFoundError:
+        return ["ADB not found - please install platform-tools and add to PATH"]
     
 def extract_files(selected_items, specific_folder=None, specific_file=None):
     target_root = "output_data"
