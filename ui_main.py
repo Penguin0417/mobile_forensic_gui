@@ -2,10 +2,13 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton,
     QLineEdit, QListWidget, QTableWidget, QTableWidgetItem,
-    QFileDialog, QMessageBox
+    QFileDialog, QMessageBox, QHeaderView, 
 )
+from PyQt5.QtGui import QColor, QBrush, QPalette, QFont
 from PyQt5.QtCore import Qt
 import os
+
+
 from utils.device_handler import (
     get_device_info,
     extract_files,
@@ -53,8 +56,12 @@ class Ui_MainWindow(QMainWindow):
         # self.filter_box.textChanged.connect(self.apply_filter)
 
         self.preview = QTableWidget(0, 2)
+        self.setWindowTitle("Metadata")
         self.preview.setColumnWidth(1, 240)
         self.preview.setHorizontalHeaderLabels(["Item Type", "Data"])
+        # Change Horizontal Header
+        header = self.preview.horizontalHeader()
+        header.setStyleSheet("QHeaderView::section { background-color: darkblue; color: white; font-weight: bold; }")
 
         self.export_pdf = QPushButton("Export to PDF")
         self.export_csv = QPushButton("Export to CSV")
@@ -74,60 +81,52 @@ class Ui_MainWindow(QMainWindow):
         layout.addWidget(self.export_csv)
         self.central.setLayout(layout)
 
+    def get_background_color(widget: QWidget):
+        palette = widget.palette()
+        color = palette.color(QPalette.Window)  # or QPalette.Background for older Qt
+        print(palette) 
+        print()
+        print(color)
+        return color.name()  # Returns color as hex string like '#ffffff'
+
+    def reset_widget_formatting(widget: QWidget):
+        # Reset stylesheet
+        widget.setStyleSheet("")
+
+        # Reset palette to application's default
+        widget.setPalette(widget.style().standardPalette())
+
+        # Reset font to default
+        widget.setFont(QFont())
+
+        # Optionally, update to apply changes immediately
+        widget.update()
+
     def toggle_dark_mode(self):
         qss_path = os.path.join(os.path.dirname(__file__), "assets", "style.qss")
-        try:
-            with open(qss_path, "r") as file:
-                self.setStyleSheet(file.read())
-        except FileNotFoundError:
-            self.device_label.setText("style.qss not found!")
+        color = self.get_background_color()
+        if color=='#2c2c2c':
+            self.reset_widget_formatting()
+            for col in range(self.preview.columnCount()):    
+                    for row in range(self.preview.rowCount()):
+                        item = self.preview.item(row, col)
+                        if item:
+                            item.setBackground(QColor("white"))
+                            item.setForeground(QBrush(QColor("black")))
+        else:
+            try:
+                with open(qss_path, "r") as file:
+                    self.setStyleSheet(file.read())
 
-    # def extract_device_data(self):
-    #     if self.selected_file_path:
-    #         extract_files([], specific_file=self.selected_file_path)
-    #         self.device_label.setText(f"Extracted: {os.path.basename(self.selected_file_path)}")
-    #     elif self.current_path:
-    #         extract_files([], specific_folder=self.current_path)
-    #         self.device_label.setText(f"Extracted folder: {self.current_path}")
-    #     else:
-    #         self.device_label.setText("Nothing to extract.")
-
-    # def preview_content(self):
-    #     self.preview.setRowCount(0)
-    #     self.selected_file_path = None
-    #     contents = get_device_folder(self.current_path)
-    #     all_records = [(item, "", self.current_path) for item in contents]
-    #     self.load_preview(all_records)
-
-    # def apply_filter(self):
-    #     text = self.filter_box.text().lower()
-    #     for row in range(self.preview.rowCount()):
-    #         visible = False
-    #         for col in range(self.preview.columnCount()):
-    #             item = self.preview.item(row, col)
-    #             if item and text in item.text().lower():
-    #                 visible = True
-    #                 break
-    #         self.preview.setRowHidden(row, not visible)
-
-    # def handle_preview_double_click(self, row, column=0):
-    #     name = self.preview.item(row, 0).text().strip()
-    #     full_path = f"{self.current_path.rstrip('/')}/{name}"
-
-    #     # Use 'ls -d path/' to check if it's a directory
-    #     try:
-    #         result = subprocess.check_output(["adb", "shell", "ls", "-d", f"{full_path}/"], stderr=subprocess.STDOUT, text=True, encoding='utf-8')
-    #         # It's a folder
-    #         self.current_path = full_path.strip()
-    #         self.selected_file_path = None
-    #         contents = get_device_folder(self.current_path)
-    #         self.checklist.clear()
-    #         self.checklist.addItems(contents)
-    #         self.device_label.setText(f"Navigated into: {self.current_path}")
-    #     except subprocess.CalledProcessError:
-    #         # It's a file
-    #         self.selected_file_path = full_path
-    #         self.device_label.setText(f"Selected file: {name}")
+                for col in range(self.preview.columnCount()):    
+                    for row in range(self.preview.rowCount()):
+                        item = self.preview.item(row, col)
+                        if item:
+                            item.setBackground(QColor("black"))
+                            item.setForeground(QBrush(QColor("white")))
+                
+            except FileNotFoundError:
+                self.device_label.setText("style.qss not found!")
 
     def navigate_forward(self, item):
         new_path = f"{self.current_path.rstrip('/')}/{item.text().strip('/')}"
@@ -220,12 +219,62 @@ class Ui_MainWindow(QMainWindow):
 
     def load_preview(self, records):
         self.preview.setRowCount(len(records))
-        for i, (col1, col2) in enumerate(records.items()):
-            self.preview.setItem(i, 0, QTableWidgetItem(col1))
-            self.preview.setItem(i, 1, QTableWidgetItem(col2))
+        for row_index, (col1, col2) in enumerate(records.items()):
+            self.preview.setItem(row_index, 0, QTableWidgetItem(col1))
+            self.preview.setItem(row_index, 1, QTableWidgetItem(col2))
+        # Change Vertical Header (Row labels)
+        v_header = self.preview.verticalHeader()
+        v_header.setStyleSheet("QHeaderView::section { background-color: darkred; color: yellow; font-weight: bold; }")
 
     def select_folder(self):
         current_file = self.checklist.currentItem().text().strip()
         self.selected_file_path = f"{self.current_path.rstrip('/')}/{current_file}"
-        self.device_label.setText(f"Selected File: {self.selected_file_path}")
+        self.device_label.setText(f"Selected File: {current_file}")
         self.show_file_info()
+
+    # def extract_device_data(self):
+    #     if self.selected_file_path:
+    #         extract_files([], specific_file=self.selected_file_path)
+    #         self.device_label.setText(f"Extracted: {os.path.basename(self.selected_file_path)}")
+    #     elif self.current_path:
+    #         extract_files([], specific_folder=self.current_path)
+    #         self.device_label.setText(f"Extracted folder: {self.current_path}")
+    #     else:
+    #         self.device_label.setText("Nothing to extract.")
+
+    # def preview_content(self):
+    #     self.preview.setRowCount(0)
+    #     self.selected_file_path = None
+    #     contents = get_device_folder(self.current_path)
+    #     all_records = [(item, "", self.current_path) for item in contents]
+    #     self.load_preview(all_records)
+
+    # def apply_filter(self):
+    #     text = self.filter_box.text().lower()
+    #     for row in range(self.preview.rowCount()):
+    #         visible = False
+    #         for col in range(self.preview.columnCount()):
+    #             item = self.preview.item(row, col)
+    #             if item and text in item.text().lower():
+    #                 visible = True
+    #                 break
+    #         self.preview.setRowHidden(row, not visible)
+
+    # def handle_preview_double_click(self, row, column=0):
+    #     name = self.preview.item(row, 0).text().strip()
+    #     full_path = f"{self.current_path.rstrip('/')}/{name}"
+
+    #     # Use 'ls -d path/' to check if it's a directory
+    #     try:
+    #         result = subprocess.check_output(["adb", "shell", "ls", "-d", f"{full_path}/"], stderr=subprocess.STDOUT, text=True, encoding='utf-8')
+    #         # It's a folder
+    #         self.current_path = full_path.strip()
+    #         self.selected_file_path = None
+    #         contents = get_device_folder(self.current_path)
+    #         self.checklist.clear()
+    #         self.checklist.addItems(contents)
+    #         self.device_label.setText(f"Navigated into: {self.current_path}")
+    #     except subprocess.CalledProcessError:
+    #         # It's a file
+    #         self.selected_file_path = full_path
+    #         self.device_label.setText(f"Selected file: {name}")
